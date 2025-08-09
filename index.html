@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FastFlag Legality Checker</title>
+<style>
+    body {
+        background: radial-gradient(circle at top, #1a1b2e, #0f101c);
+        color: #fff;
+        font-family: "Segoe UI", Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 20px;
+    }
+    .container {
+        background: rgba(35, 36, 58, 0.85);
+        backdrop-filter: blur(12px);
+        padding: 30px 35px;
+        border-radius: 18px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.45);
+        width: 500px;
+        max-width: 95%;
+        animation: fadeIn 0.8s ease;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    h1 {
+        text-align: center;
+        margin-bottom: 22px;
+        font-size: 26px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #4cafef, #a64af1);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        color: transparent;
+        letter-spacing: 0.5px;
+    }
+    textarea {
+        width: 100%;
+        box-sizing: border-box;
+        height: 160px;
+        background: rgba(20, 21, 35, 0.9);
+        color: #e5e5e5;
+        border: 1px solid rgba(255,255,255,0.08);
+        outline: none;
+        resize: none;
+        padding: 14px;
+        border-radius: 10px;
+        font-family: monospace;
+        font-size: 14px;
+        transition: box-shadow 0.25s ease, transform 0.15s ease, border 0.25s ease;
+    }
+    textarea:focus {
+        box-shadow: 0 0 12px rgba(76, 175, 239, 0.6);
+        border: 1px solid rgba(76, 175, 239, 0.5);
+        transform: scale(1.01);
+    }
+    button {
+        width: 100%;
+        box-sizing: border-box;
+        background: linear-gradient(90deg, #4cafef, #a64af1);
+        color: white;
+        border: none;
+        padding: 14px;
+        margin-top: 14px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.3s ease;
+    }
+    button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(76, 175, 239, 0.4);
+    }
+    .result {
+        margin-top: 18px;
+        padding: 14px;
+        border-radius: 10px;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.4s ease, transform 0.4s ease;
+        font-size: 14px;
+        line-height: 1.5;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .result.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .result.flash {
+        animation: flashBg 0.4s ease;
+    }
+    @keyframes flashBg {
+        from { filter: brightness(1.3); }
+        to { filter: brightness(1); }
+    }
+    .legal {
+        background: rgba(46, 125, 50, 0.85);
+        border-left: 5px solid #66bb6a;
+    }
+    .illegal {
+        background: rgba(198, 40, 40, 0.85);
+        border-left: 5px solid #ef5350;
+    }
+    ul {
+        padding-left: 20px;
+        margin: 8px 0 0;
+    }
+    strong {
+        font-size: 15px;
+    }
+    .icon {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>FastFlag Legality Checker</h1>
+    <textarea id="ffInput" placeholder='Paste your FastFlags here...'></textarea>
+    <button onclick="checkFlags()">Check</button>
+    <div id="result" class="result" style="display:none;"></div>
+</div>
+
+<script>
+const illegalKeywords = [
+    "Interpolation",
+    "Interpolated",
+    "Interpolate",
+    "Physic",
+    "Humanoid",
+    "Timestep",
+    "DataSender",
+    "RunningController2",
+    "FrameBuffer",
+    "RakNetMtuValue",
+    "MTUSize" // Special handling
+];
+
+function checkFlags() {
+    const input = document.getElementById("ffInput").value;
+    const lines = input.split(/\r?\n/);
+    let foundIllegal = [];
+    let mtuSizeFound = false;
+
+    for (let line of lines) {
+        let cleanLine = line.trim().replace(/[:,"]/g, "");
+        if (!cleanLine) continue;
+
+        let parts = cleanLine.split(/\s+/);
+        let flagName = parts[0];
+        let flagValue = parts.length > 1 ? parts[1] : "";
+
+        for (const keyword of illegalKeywords) {
+            if (flagName.toLowerCase().includes(keyword.toLowerCase())) {
+
+                if (keyword === "MTUSize") {
+                    mtuSizeFound = true;
+                    if (flagValue === "1396") {
+                        continue; // Legal case
+                    }
+                }
+
+                foundIllegal.push(flagName + (flagValue ? ` (${flagValue})` : ""));
+                break;
+            }
+        }
+    }
+
+    const resultDiv = document.getElementById("result");
+    resultDiv.style.display = "flex";
+
+    resultDiv.classList.remove("flash");
+    void resultDiv.offsetWidth;
+    resultDiv.classList.add("flash", "show");
+
+    if (foundIllegal.length > 0) {
+        resultDiv.className = "result illegal show flash";
+        resultDiv.innerHTML = `
+            <div>
+                <strong>${foundIllegal.length} illegal FastFlags found:</strong>
+                <ul>${foundIllegal.map(f => `<li>${f}</li>`).join('')}</ul>
+                ${mtuSizeFound ? `<br><small>Note: MTUSize is normally illegal unless set to <code>1396</code>.</small>` : ""}
+            </div>`;
+    } else {
+        resultDiv.className = "result legal show flash";
+        resultDiv.innerHTML = `
+            <div>
+                <strong>All flags are legal</strong>
+                ${mtuSizeFound ? `<br><small>Note: MTUSize is normally illegal unless set to <code>1396</code>.</small>` : ""}
+            </div>`;
+    }
+}
+</script>
+</body>
+</html>
